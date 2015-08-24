@@ -7,6 +7,9 @@ __pycache__/
 *.par
 *.lines
 
+Output/*
+!Output/README.md
+
 # C extensions
 *.so
 
