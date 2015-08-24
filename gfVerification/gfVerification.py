@@ -7,32 +7,81 @@ import MoogTools
 import SpectralTools
 import pyfits
 
-def calculateCM(SynthObj, solarWl, rebinnedSpectrum, nominalWave, nominalSpectrum):
-    IM = numpy.zeros((SynthObj.lineList.numLines+2, len(solarWl)))
-    for i in range(SynthObj.lineList.numLines):
-        SynthObj.lineList.perturbLine(i, 0.3)
-        wave, flux = SynthObj.run()
-        plus = SpectralTools.binSpectrum(flux, wave, solarWl)
-        SynthObj.lineList.perturbLine(i, -0.3)
-        wave, flux = SynthObj.run()
-        minus = SpectralTools.binSpectrum(flux, wave, solarWl)
-        IM[i,:] = (plus - minus)/0.6
+def calculateCM(SynthObj, nominalWave, nominalSpectrum):
+    solarWl = SynthObj.solarSpectrum.wave
+    solarFl = SynthObj.solarSpectrum.flux
+
+    nLines = SynthObj.lineList.numLines
+    nModes = nLines+2
+    IM = numpy.zeros((nModes, len(solarWl)))
+    stroke = numpy.ones(nModes)
+    factor = numpy.ones(nModes) * 0.3
+    factor[-1] = 0.005
+    factor[-2] = 0.1
+    for i in range(nLines):
+        count = 0
+        while ((factor[i] < 0.9) | (factor[i] > 1.1)):
+            stroke[i] *= factor[i]
+            SynthObj.lineList.perturbLine(i, stroke[i], partial=True)
+            wave, plus = SynthObj.run()
+            SynthObj.lineList.perturbLine(i, -stroke[i], partial=True)
+            wave, minus = SynthObj.run()
+            factor[i] = numpy.abs(0.1/numpy.min(plus-minus))
+            if factor[i] > 1e3:    # The line probably does not contribute
+                factor[i] = 1.0
+            count += 1
+            if count  > 8:
+                factor[i] = 1.0
+        stroke[i] *= factor[i]
+        print factor
+        print stroke
+        print count
+        raw_input()
+
+    for i in range(nLines):
+        SynthObj.lineList.perturbLine(i, stroke[i])
+        wave, plus = SynthObj.run()
+        SynthObj.lineList.perturbLine(i, -stroke[i])
+        wave, minus = SynthObj.run()
+        IM[i, :] = SpectralTools.interpolate_spectrum(wave, solarWl,
+                (plus-minus)/(2.0*stroke[i]))
 
     #Continuum Level
-    plus = rebinnedSpectrum.copy()+ 0.005
-    minus = rebinnedSpectrum.copy()- 0.005
-    IM[-1, :] = (plus-minus)/0.01
+    plus = nominalSpectrum + stroke[-1]
+    minus = nominalSpectrum - stroke[-1]
+    factor[-1] = 1.0
+    IM[-1, :] = SpectralTools.interpolate_spectrum(wave, solarWl, (plus-minus)/0.01)
+    
+    #Wavelength Shift
+    plus = SpectralTools.interpolate_spectrum(wave, wave-stroke[-2],
+            nominalSpectrum, pad=True)
+    minus = SpectralTools.interpolate_spectrum(wave, wave+stroke[-2],
+            nominalSpectrum, pad=True)
+    factor[-2] = 1.0
+    IM[-2, :] = SpectralTools.interpolate_spectrum(wave, solarWl, (plus-minus)/(0.2))
+    #while ((factor < 0.9) | (factor > 1.1)).any():
+    #    stroke *= factor
+    #    for i in range(nLines):
+    #        SynthObj.lineList.perturbLine(i, stroke[i])
+    #        wave, plus = SynthObj.run()
+    #        SynthObj.lineList.perturbLine(i, -stroke[i])
+    #        wave, minus = SynthObj.run()
+    #        factor[i] = numpy.abs(0.1/numpy.min(plus-minus))
+    #        IM[i,:] = SpectralTools.interpolate_spectrum(wave, solarWl,
+    #                (plus-minus)/(2.0*stroke[i]))
 
-    plus = SpectralTools.binSpectrum(nominalSpectrum, nominalWave+0.1, solarWl)
-    minus = SpectralTools.binSpectrum(nominalSpectrum, nominalWave-0.1, solarWl)
-    edges = (plus !=0) & (minus != 0)
-    IM[-2, edges] = (plus[edges]-minus[edges])/(0.2)
 
-    nFilt = Synth.lineList.numLines-10
+    #    print stroke
+    #    print factor
+
+    hdu = pyfits.PrimaryHDU(IM)
+    hdu.writeto("./Output/InteractionMatrix.fits", clobber=True)
+
     dims = IM.shape
     U,S,V = scipy.linalg.svd(IM)
-    D = 1.0/(S[0:-nFilt])
-    S[-nFilt:] = 0.0
+    D = 1.0/S
+    #D = 1.0/(S[0:-nFilt])
+    #S[-nFilt:] = 0.0
     newS = numpy.zeros((dims[0], dims[1]))
     I = [i for i in range(dims[1])]
     for i in range(len(D)):
@@ -42,7 +91,7 @@ def calculateCM(SynthObj, solarWl, rebinnedSpectrum, nominalWave, nominalSpectru
     CM = numpy.array(scipy.matrix(V.T.dot(S.T.dot(U.T)),dtype=numpy.float32)).T
 
     hdu = pyfits.PrimaryHDU(CM)
-    hdu.writeto('CommandMatrix_new.fits', clobber=True)
+    hdu.writeto('./Output/CommandMatrix.fits', clobber=True)
 
 
 
@@ -55,17 +104,14 @@ Synth.solarSpectrum.fixDiscontinuities()
 Synth.solarSpectrum.flipWavelength()
 
 solarWave = Synth.solarSpectrum.wave + 0.2
+solarFlux = Synth.solarSpectrum.flux
 
-
-wavelengths, nominalSpectrum = Synth.run()
-
-rebinnedNominalSpectrum = SpectralTools.binSpectrum(nominalSpectrum, wavelengths,
-        solarWave)
+wave, nominalSpectrum = Synth.run()
 
 if False:
-    calculateCM(Synth, solarWave, rebinnedNominalSpectrum, wavelengths, nominalSpectrum)
+    calculateCM(Synth, wave, nominalSpectrum)
 
-CM = pyfits.getdata("CommandMatrix_new.fits")
+CM = pyfits.getdata("./Output/CommandMatrix.fits")
 
 f1 = pyplot.figure(0)
 f1.clear()
@@ -74,9 +120,9 @@ ax1 = f1.add_axes([0.1, 0.1, 0.8, 0.8])
 ax1.matshow(CM, aspect='auto')
 f1.show()
 
-Spectra = [rebinnedNominalSpectrum.copy()]
+Spectra = [SpectralTools.interpolate_spectrum(wave, solarWave, nominalSpectrum, pad=True)]
 
-Gain = 1.0
+Gain = 0.5
 
 f2 = pyplot.figure(1)
 f2.clear()
@@ -86,16 +132,17 @@ continuum = 0.0
 wlOffset = 0.0
 
 while True:
-    difference = Spectra[-1] - Synth.solarSpectrum.flux
+    x, difference = SpectralTools.diff_spectra(solarWave, solarFlux,
+            solarWave, Spectra[-1], pad=True)
     difference[Spectra[-1] == 0] = 0.0
-    command = -Gain*(CM.dot(difference))
+    command = Gain*(CM.dot(difference))
     
     Synth.lineList.applyCorrection(command[:-2])
     continuum = continuum+command[-1]
-    wlOffset = wlOffset-command[-2]
+    wlOffset = wlOffset+command[-2]
     wave, flux = Synth.run()
-    Spectra.append(SpectralTools.binSpectrum(flux+continuum,
-        wave+wlOffset, solarWave))
+    Spectra.append(SpectralTools.interpolate_spectrum(wave+wlOffset, solarWave,
+        flux+continuum, pad=True))
 
     ax2.clear()
     ax2.plot(solarWave, Synth.solarSpectrum.flux)
@@ -103,6 +150,7 @@ while True:
         ax2.plot(solarWave, spec)
     f2.show()
     print wlOffset, command[-2]
+    print continuum, command[-1]
     raw_input()
 
 
