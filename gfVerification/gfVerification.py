@@ -15,28 +15,31 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     nModes = nLines+2
     IM = numpy.zeros((nModes, len(solarWl)))
     stroke = numpy.ones(nModes)
+    target = numpy.ones(nModes) * 0.1
     factor = numpy.ones(nModes) * 0.3
     factor[-1] = 0.005
     factor[-2] = 0.1
+    f3 = pyplot.figure(3)
+    ax3 = f3.add_axes([0.1, 0.1, 0.8, 0.8])
     for i in range(nLines):
         count = 0
+        SynthObj.lineList.perturbLine(i, 0.0, partial=True)
+        wave, flux = SynthObj.run()
+        if i < len(SynthObj.lineList.strongLines):
+            target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.strongLines[i].wl).argsort()[0]])/10.0
+        else:
+            target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.weakLines[i-len(SynthObj.lineList.strongLines)].wl).argsort()[0]])/10.0
         while ((factor[i] < 0.9) | (factor[i] > 1.1)):
             stroke[i] *= factor[i]
             SynthObj.lineList.perturbLine(i, stroke[i], partial=True)
             wave, plus = SynthObj.run()
             SynthObj.lineList.perturbLine(i, -stroke[i], partial=True)
             wave, minus = SynthObj.run()
-            factor[i] = numpy.abs(0.1/numpy.min(plus-minus))
+            factor[i] = numpy.abs(target[i]/numpy.min(plus-minus))
             if factor[i] > 1e3:    # The line probably does not contribute
                 factor[i] = 1.0
             count += 1
-            if count  > 8:
-                factor[i] = 1.0
         stroke[i] *= factor[i]
-        print factor
-        print stroke
-        print count
-        raw_input()
 
     for i in range(nLines):
         SynthObj.lineList.perturbLine(i, stroke[i])
@@ -122,7 +125,7 @@ f1.show()
 
 Spectra = [SpectralTools.interpolate_spectrum(wave, solarWave, nominalSpectrum, pad=True)]
 
-Gain = 0.5
+Gain = 0.15
 
 f2 = pyplot.figure(1)
 f2.clear()
