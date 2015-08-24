@@ -22,29 +22,35 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     f3 = pyplot.figure(3)
     ax3 = f3.add_axes([0.1, 0.1, 0.8, 0.8])
     for i in range(nLines):
-        count = 0
-        SynthObj.lineList.perturbLine(i, 0.0, partial=True)
+        SynthObj.lineList.writeLineLists(i)
         wave, flux = SynthObj.run()
-        if i < len(SynthObj.lineList.strongLines):
+        if i < SynthObj.lineList.nStrong:
             target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.strongLines[i].wl).argsort()[0]])/10.0
         else:
-            target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.weakLines[i-len(SynthObj.lineList.strongLines)].wl).argsort()[0]])/10.0
+            target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.weakLines[i-SynthObj.lineList.nStrong].wl).argsort()[0]])/10.0
         while ((factor[i] < 0.9) | (factor[i] > 1.1)):
             stroke[i] *= factor[i]
-            SynthObj.lineList.perturbLine(i, stroke[i], partial=True)
+            SynthObj.lineList.perturbGf(i, stroke[i])
+            SynthObj.lineList.writeLineLists(i)
             wave, plus = SynthObj.run()
-            SynthObj.lineList.perturbLine(i, -stroke[i], partial=True)
+            SynthObj.lineList.perturbGf(i, -2.0*stroke[i])
+            SynthObj.lineList.writeLineLists(i)
             wave, minus = SynthObj.run()
+            SynthObj.lineList.perturbGf(i, stroke[i])
             factor[i] = numpy.abs(target[i]/numpy.min(plus-minus))
-            if factor[i] > 1e3:    # The line probably does not contribute
+            if factor[i] > 1e3:  # Probably doesn't contribute much
                 factor[i] = 1.0
-            count += 1
         stroke[i] *= factor[i]
+        print stroke
+        print factor
+        raw_input()
 
     for i in range(nLines):
-        SynthObj.lineList.perturbLine(i, stroke[i])
+        SynthObj.lineList.perturbGf(i, stroke[i])
+        SynthObj.lineList.writeLineLists(i)
         wave, plus = SynthObj.run()
-        SynthObj.lineList.perturbLine(i, -stroke[i])
+        SynthObj.lineList.perturbGf(i, -2.0*stroke[i])
+        SynthObj.lineList.writeLineLists(i)
         wave, minus = SynthObj.run()
         IM[i, :] = SpectralTools.interpolate_spectrum(wave, solarWl,
                 (plus-minus)/(2.0*stroke[i]))
@@ -111,7 +117,7 @@ solarFlux = Synth.solarSpectrum.flux
 
 wave, nominalSpectrum = Synth.run()
 
-if False:
+if True:
     calculateCM(Synth, wave, nominalSpectrum)
 
 CM = pyfits.getdata("./Output/CommandMatrix.fits")
