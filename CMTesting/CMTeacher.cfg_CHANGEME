@@ -6,10 +6,10 @@ wlStart = 12765
 wlStop = 12775
 
 # Atomic and Molecular line files for generating Moog line lists
-strong_file = /home/deen/Data/MoogStokes/VALD_lines/lines.strong
-molecules = /home/deen/Data/MoogStokes/VALD_lines/Molecules/
+strong_file = /home/deen/Code/Python/MoogPy/data/AbsorptionLines/VALD/lines.strong
+molecules = /home/deen/Code/Python/MoogPy/data/AbsorptionLines/Molecular
 VALD_file = ./data/fake_line_teacher.txt
-gf_file = /home/deen/Data/MoogStokes/VALD_lines/osv/corrected_lines.dat
+gf_file = /home/deen/Code/Python/MoogPy/data/AbsorptionLines/corrections/corrected_lines.dat
 doMolecules = False
 
 # Parameters for the Moog .par file
