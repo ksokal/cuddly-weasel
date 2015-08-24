@@ -1,11 +1,11 @@
 synth
 atmos_dir   '/home/deen/Data/Atmospheres/'
-lines_in   'weak.lines'
+lines_in   'MoogSandbox/weak.lines'
 standard_out   './Output/out1'
 model_in   'MARCS_Solar.md'
 summary_out   './Output/summary.out'
 smoothed_out   './Output/smoothed.out'
-stronglines_in   'strong.lines'
+stronglines_in   'MoogSandbox/strong.lines'
 terminal    x11
 freeform    0
 atmosphere    1
