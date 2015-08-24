@@ -1,5 +1,5 @@
 synth
-atmos_dir   '/home/deen/Data/MoogStokes/Atmospheres/'
+atmos_dir   '/home/deen/Data/Atmospheres/'
 lines_in   'weak.lines'
 standard_out   './Output/out1'
 model_in   'MARCS_Solar.md'
