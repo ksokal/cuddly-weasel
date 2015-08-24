@@ -6,6 +6,8 @@ __pycache__/
 *.cfg
 *.par
 *.lines
+out1
+summary.out
 
 Output/*
 !Output/README.md
