@@ -53,5 +53,5 @@ Synth.lineList.writeLineLists()
 Synth.parameterFile.writeParFile()
 
 wavelengths, nominalSpectrum = Synth.run()
-
-SpectralTools.write_2col_spectrum("observed.dat", wavelengths, nominalSpectrum)
+newWave, newFlux = SpectralTools.resample(wavelengths, nominalSpectrum, 40000)
+SpectralTools.write_2col_spectrum("observed.dat", newWave, newFlux)
