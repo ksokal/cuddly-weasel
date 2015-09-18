@@ -13,19 +13,20 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     resolution = 45000.0
     nLines = SynthObj.lineList.numLines
     nModes = 2*nLines+3
+    nFilt = nLines
 
     IM = numpy.zeros((nModes, len(solarWl)))
+
     stroke = numpy.ones(nModes)
-    target = numpy.ones(nModes) * 0.1
     factor = numpy.ones(nModes)
-    factor[-1] = 0.005                  # Continuum Shift
-    factor[-2] = 0.1                    # WL Shift
-    factor[-3] = 0.01                # Smoothing
+    stroke[-1] = 0.005                  # Continuum Shift
+    stroke[-2] = 0.1                    # WL Shift
+    stroke[-3] = 0.01                # Smoothing
     for i in range(nLines):
         SynthObj.lineList.writeLineLists(i)
         wave, flux = SynthObj.run()
         stroke[i*2] = SynthObj.lineList.getGf(i)/5.0
-        stroke[i*2+1] = SynthObj.lineList.getVdW(i)/30.0
+        stroke[i*2+1] = 0.5
         """
         while ((factor[i] < 0.9) | (factor[i] > 1.1)):
             stroke[i] *= factor[i]
@@ -56,6 +57,8 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
         SynthObj.lineList.perturbGf(i, stroke[i*2])
         IM[i*2,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
                         (plus - minus)/(2.0*stroke[i*2]), pad=0.0)
+        factor[i*2] = numpy.max(numpy.abs(IM[i*2,:]))
+        IM[i*2,:] /= factor[i*2]
 
         # damping
         SynthObj.lineList.perturbVdW(i, stroke[i*2+1])
@@ -68,40 +71,43 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
         newWave, minus = SpectralTools.resample(wave, minus, resolution)
         SynthObj.lineList.perturbVdW(i, stroke[i*2+1])
         IM[i*2+1,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
-                        (plus - minus)/(2.0*stroke[i*2+1]), pad=0.0)
+                        (plus-minus)/(2.0*stroke[i*2+1]), pad=0.0)
+        factor[i*2+1] = numpy.max(numpy.abs(IM[i*2,:]))
+        IM[i*2+1,:] /= factor[i*2+1]
 
 
 
     #Continuum Level
-    stroke[-1] *= factor[-1]
     plus = nominalSpectrum + stroke[-1]
     newWave, plus = SpectralTools.resample(nominalWave, plus, resolution)
     minus = nominalSpectrum - stroke[-1]
     newWave, minus = SpectralTools.resample(nominalWave, minus, resolution)
-    factor[-1] = 1.0
 
     IM[-1, :] = SpectralTools.interpolate_spectrum(newWave, solarWl, 
         (plus-minus)/(2.0*stroke[-1]), pad=0.0)
+    factor[-1] = numpy.max(numpy.abs(IM[-1,:]))
+    IM[-1,:] /= factor[-1]
 
     #Wavelength Shift
-    stroke[-2] *= factor[-2]
     plus = SpectralTools.interpolate_spectrum(wave, wave-stroke[-2], nominalSpectrum,
             pad=True)
     newWave, plus = SpectralTools.resample(wave, plus, resolution)
     minus = SpectralTools.interpolate_spectrum(wave, wave+stroke[-2], nominalSpectrum,
             pad=True)
     newWave, minus = SpectralTools.resample(wave, minus, resolution)
-    factor[-2] = 1.0
     IM[-2, :] = SpectralTools.interpolate_spectrum(newWave, solarWl, 
                 (plus-minus)/(2.0*stroke[-2]), pad=0.0)
+    factor[-2] = numpy.max(numpy.abs(IM[-2,:]))
+    IM[-2,:] /= factor[-2]
 
     #"""
     #Instrumental Smoothing
-    stroke[-3] *= factor[-3]
     wavePlus, plus = SpectralTools.resample(wave, nominalSpectrum, resolution*(1.0+stroke[-3]))
     waveMinus, minus = SpectralTools.resample(wave, nominalSpectrum, resolution*(1.0-stroke[-3]))
     diffx, diffy = SpectralTools.diff_spectra(wavePlus, plus, waveMinus, minus, pad=True)
     IM[-3,:] = SpectralTools.interpolate_spectrum(diffx, solarWl, diffy/(2.0*stroke[-3]), pad=0.0)
+    factor[-3] = numpy.max(numpy.abs(IM[-3,:]))
+    IM[-3,:] /= factor[-3]
     #"""
 
 
@@ -123,12 +129,15 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
 
     hdu = pyfits.PrimaryHDU(CM)
     hdu.writeto('CommandMatrix.fits', clobber=True)
+    hdu = pyfits.PrimaryHDU(factor)
+    hdu.writeto('scalingfactor.fits', clobber=True)
 
 
 
 configFile = 'CMStudent.cfg'
 
-diffplot = True
+#diffplot = True
+diffplot = False
 
 Synth = MoogTools.Moog(configFile)
 Synth.lineList.writeLineLists()
@@ -150,6 +159,7 @@ if True:
 
 CM = pyfits.getdata("CommandMatrix.fits")
 
+
 f1 = pyplot.figure(0)
 f1.clear()
 ax1 = f1.add_axes([0.1, 0.1, 0.8, 0.8])
@@ -166,6 +176,10 @@ Gain = 0.35
 f2 = pyplot.figure(1)
 f2.clear()
 ax2 = f2.add_axes([0.1, 0.1, 0.8, 0.8])
+
+f3 = pyplot.figure(2)
+f3.clear()
+ax3 = f3.add_axes([0.1, 0.1, 0.8, 0.8])
 
 while True:
     x, difference = SpectralTools.diff_spectra(solarWave, solarFlux, 
@@ -195,6 +209,15 @@ while True:
         for w, spec in zip(Wavelengths, Spectra):
             ax2.plot(w, spec)
     f2.show()
+    ax3.clear()
+    for line in range(Synth.lineList.nStrong):
+        ax3.plot(Synth.lineList.strongLines[line].loggfHistory)
+        ax3.plot(Synth.lineList.strongLines[line].VdWHistory)
+    for line in range(Synth.lineList.numLines - Synth.lineList.nStrong):
+        ax3.plot(Synth.lineList.weakLines[line].loggfHistory)
+        ax3.plot(Synth.lineList.weakLines[line].VdWHistory)
+    f3.show()
+
     print numpy.log10(Synth.lineList.getGf(0)), numpy.log10(Synth.lineList.getVdW(0))
     print numpy.log10(Synth.lineList.getGf(1)), numpy.log10(Synth.lineList.getVdW(1))
     print numpy.log10(Synth.lineList.getGf(2)), numpy.log10(Synth.lineList.getVdW(2))

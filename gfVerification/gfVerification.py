@@ -10,96 +10,71 @@ import pyfits
 def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     solarWl = SynthObj.solarSpectrum.wave
     solarFl = SynthObj.solarSpectrum.flux
-
     resolution = 80000.0
     nLines = SynthObj.lineList.numLines
-    nModes = nLines+3
+    nModes = 2*nLines+3
+    nFilt = nLines
+
     IM = numpy.zeros((nModes, len(solarWl)))
     stroke = numpy.ones(nModes)
-    target = numpy.ones(nModes) * 0.1
-    factor = numpy.ones(nModes) * 0.3
-    factor[-1] = 0.005          # Continuum Shift
-    factor[-2] = 0.01           # WL Shift
-    factor[-3] = 10000.0            # Resolution
-    f3 = pyplot.figure(3)
-    ax3 = f3.add_axes([0.1, 0.1, 0.8, 0.8])
-    #"""
+    stroke[-1] = 0.005          # Continuum Shift
+    stroke[-2] = 0.1           # WL Shift
+    stroke[-3] = 0.01            # Resolution
     for i in range(nLines):
         SynthObj.lineList.writeLineLists(i)
         wave, flux = SynthObj.run()
-        target[i] = (1.0 - numpy.min(flux))/10.0
-        #if i < SynthObj.lineList.nStrong:
-        #    target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.strongLines[i].wl).argsort()[0]])/10.0
-        #else:
-        #    target[i] = (1.0 - flux[numpy.abs(wave-SynthObj.lineList.weakLines[i-SynthObj.lineList.nStrong].wl).argsort()[0]])/10.0
-        while ((factor[i] < 0.9) | (factor[i] > 1.1)):
-            stroke[i] *= factor[i]
-            SynthObj.lineList.perturbGf(i, stroke[i])
-            SynthObj.lineList.writeLineLists(i, partial=True)
-            wave, plus = SynthObj.run()
-            wave, plus = SpectralTools.resample(wave, plus, resolution)
-            SynthObj.lineList.perturbGf(i, -2.0*stroke[i])
-            SynthObj.lineList.writeLineLists(i, partial=True)
-            wave, minus = SynthObj.run()
-            wave, minus = SpectralTools.resample(wave, minus, resolution)
-            SynthObj.lineList.perturbGf(i, stroke[i])
-            factor[i] = numpy.abs(target[i]/(numpy.min(plus)-numpy.min(minus)))
-            if factor[i] > 1e3:  # Probably doesn't contribute much
-                factor[i] = 1.0
-                stroke[i] = 0.01
-            """
-            print i, target[i], factor[i], stroke[i], SynthObj.lineList.weakLines[i-SynthObj.lineList.nStrong].loggf
-            print numpy.min(plus), numpy.min(minus)
-            raw_input()
-            #"""
-        stroke[i] *= factor[i]
-        """
-        print stroke
-        print factor
-        print i
-        raw_input()
-        #"""
+        stroke[i*2] = SynthObj.lineList.getGf(i)/5.0
+        stroke[i*2+1] = 0.5
 
     for i in range(nLines):
-        SynthObj.lineList.perturbGf(i, stroke[i])
+        #  log gf
+        SynthObj.lineList.perturbGf(i, stroke[i*2])
         SynthObj.lineList.writeLineLists(i)
         wave, plus = SynthObj.run()
         newWave, plus = SpectralTools.resample(wave, plus, resolution)
-        SynthObj.lineList.perturbGf(i, -2.0*stroke[i])
+        SynthObj.lineList.perturbGf(i, -2.0*stroke[i*2])
         SynthObj.lineList.writeLineLists(i)
         wave, minus = SynthObj.run()
         newWave, minus = SpectralTools.resample(wave, minus, resolution)
-        IM[i, :] = SpectralTools.interpolate_spectrum(newWave, solarWl,
-                (plus-minus)/(2.0*stroke[i]), pad=True)
+        SynthObj.lineList.perturbGf(i, stroke[i*2])
+        IM[i*2, :] = SpectralTools.interpolate_spectrum(newWave, solarWl,
+                (plus-minus)/(2.0*stroke[i*2]), pad=0.0)
 
-    #"""
+        #  Damping
+        SynthObj.lineList.perturbVdW(i, stroke[i*2+1])
+        SynthObj.lineList.writeLineLists(i)
+        wave, plus = SynthObj.run()
+        newWave, plus = SpectralTools.resample(wave, plus, resolution)
+        SynthObj.lineList.perturbVdW(i, -2.0*stroke[i*2+1])
+        SynthObj.lineList.writeLineLists(i)
+        wave, minus = SynthObj.run()
+        newWave, minus = SpectralTools.resample(wave, minus, resolution)
+        SynthObj.lineList.perturbGf(i, stroke[i*2+1])
+        IM[i*2+1, :] = SpectralTools.interpolate_spectrum(newWave, solarWl,
+                (plus-minus)/(2.0*stroke[i*2]), pad=0.0)
+
     #Continuum Level
-    stroke[-1] *= factor[-1]
     plus = nominalSpectrum + stroke[-1]
-    newWave, plus = SpectralTools.resample(wave, plus, resolution)
+    newWave, plus = SpectralTools.resample(nominalWave, plus, resolution)
     minus = nominalSpectrum - stroke[-1]
-    newWave, minus = SpectralTools.resample(wave, minus, resolution)
-    factor[-1] = 1.0
+    newWave, minus = SpectralTools.resample(nominalWave, minus, resolution)
 
-    IM[-1, :] = SpectralTools.interpolate_spectrum(newWave, solarWl, (plus-minus)/(2.0*stroke[-1]), pad=True)
+    IM[-1, :] = SpectralTools.interpolate_spectrum(newWave, solarWl, (plus-minus)/(2.0*stroke[-1]), pad=0.0)
     
     #Wavelength Shift
-    stroke[-2] *= factor[-2]
     plus = SpectralTools.interpolate_spectrum(wave, wave-stroke[-2],
             nominalSpectrum, pad=True)
     newWave, plus = SpectralTools.resample(wave, plus, resolution)
     minus = SpectralTools.interpolate_spectrum(wave, wave+stroke[-2],
             nominalSpectrum, pad=True)
     newWave, minus = SpectralTools.resample(wave, minus, resolution)
-    factor[-2] = 1.0
     IM[-2, :] = SpectralTools.interpolate_spectrum(newWave, solarWl, (plus-minus)/(2.0*stroke[-2]), pad=True)
 
     #Instrumental smoothing
-    stroke[-3] *= factor[-3]
-    wavePlus, plus = SpectralTools.resample(wave, nominalSpectrum, resolution + stroke[-3])
-    waveMinus, minus = SpectralTools.resample(wave, nominalSpectrum, resolution - stroke[-3])
+    wavePlus, plus = SpectralTools.resample(wave, nominalSpectrum, resolution*(1.0 + stroke[-3]))
+    waveMinus, minus = SpectralTools.resample(wave, nominalSpectrum, resolution*(1.0 - stroke[-3]))
     diffx, diffy = SpectralTools.diff_spectra(wavePlus, plus, waveMinus, minus, pad=True)
-    IM[-3,:] = SpectralTools.interpolate_spectrum(wavePlus, solarWl, diffy/(2.0*stroke[-3]), pad=True)
+    IM[-3,:] = SpectralTools.interpolate_spectrum(diffx, solarWl, diffy/(2.0*stroke[-3]), pad=0.0)
 
     hdu = pyfits.PrimaryHDU(IM)
     hdu.writeto("./Output/InteractionMatrix.fits", clobber=True)
@@ -123,6 +98,7 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
 
 
 configFile = 'gfVerification.cfg'
+#configFile = 'small.cfg'
 
 Synth = MoogTools.Moog(configFile)
 Synth.lineList.writeLineLists()
@@ -130,14 +106,21 @@ Synth.parameterFile.writeParFile()
 Synth.solarSpectrum.fixDiscontinuities()
 Synth.solarSpectrum.flipWavelength()
 
-solarWave = Synth.solarSpectrum.wave + 0.2
+continuum = 0.0
+wlOffset = 0.0
+resolution = 580000.0
+
+diffplot = False
+
+solarWave = Synth.solarSpectrum.wave  + 0.2
 solarFlux = Synth.solarSpectrum.flux
 
-wave, nominalSpectrum = Synth.run()
+nominalWavelength, nominalSpectrum = Synth.run()
+wave, spectrum = SpectralTools.resample(nominalWavelength, nominalSpectrum, resolution)
 
-#if True:
-if False:
-    calculateCM(Synth, wave, nominalSpectrum)
+#if False:
+if True:
+    calculateCM(Synth, nominalWavelength, nominalSpectrum)
 
 CM = pyfits.getdata("./Output/CommandMatrix.fits")
 
@@ -148,36 +131,49 @@ ax1 = f1.add_axes([0.1, 0.1, 0.8, 0.8])
 ax1.matshow(CM, aspect='auto')
 f1.show()
 
-Spectra = [SpectralTools.interpolate_spectrum(wave, solarWave, nominalSpectrum, pad=True)]
+Spectra = [spectrum]
+Wavelengths = [wave]
 
-Gain = 0.15
+Gain = 0.35
 
 f2 = pyplot.figure(1)
 f2.clear()
 ax2 = f2.add_axes([0.1, 0.1, 0.8, 0.8])
 
-continuum = 0.0
-wlOffset = 0.0
+raw_input()
 
 while True:
     x, difference = SpectralTools.diff_spectra(solarWave, solarFlux,
-            solarWave, Spectra[-1], pad=True)
+            Wavelengths[-1], Spectra[-1], pad=True)
     difference[Spectra[-1] == 0] = 0.0
     command = Gain*(CM.dot(difference))
     
-    Synth.lineList.applyCorrection(command[:-3])
+    Synth.lineList.applyCorrection(command[:-2])
     continuum = continuum+command[-1]
     wlOffset = wlOffset+command[-2]
-    resolution = resolution+command[-3]
+    resolution = resolution*(1.0+command[-3])
     wave, flux = Synth.run()
-    Spectra.append(SpectralTools.interpolate_spectrum(wave+wlOffset, solarWave,
-        flux+continuum, pad=True))
+
+    wavelength, spectrum = SpectralTools.resample(wave, flux, resolution)
+    Spectra.append(spectrum+continuum)
+    Wavelengths.append(wavelength+wlOffset)
+
+    ax1.clear()
+    ax1.plot(command)
+    f1.show()
 
     ax2.clear()
-    ax2.plot(solarWave, Synth.solarSpectrum.flux)
-    for spec in Spectra:
-        ax2.plot(solarWave, spec)
+    if diffplot:
+        x, difference = SpectralTools.diff_spectra(solarWave, solarFlux, 
+                Wavelengths[-1], Spectra[-1], pad = True)
+        difference[Spectra[-1] == 0.0] = 0.0
+        ax2.plot(x, difference)
+    else:
+        ax2.plot(solarWave, solarFlux)
+        for w, spec in zip(Wavelengths, Spectra):
+            ax2.plot(w, spec)
     f2.show()
+    print resolution, command[-3]
     print wlOffset, command[-2]
     print continuum, command[-1]
     raw_input()
