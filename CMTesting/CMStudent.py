@@ -25,8 +25,8 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     for i in range(nLines):
         SynthObj.lineList.writeLineLists(i)
         wave, flux = SynthObj.run()
-        stroke[i*2] = SynthObj.lineList.getGf(i)/5.0
-        stroke[i*2+1] = 0.5
+        stroke[i] = SynthObj.lineList.getGf(i)/5.0
+        stroke[i+nLines] = 0.1
         """
         while ((factor[i] < 0.9) | (factor[i] > 1.1)):
             stroke[i] *= factor[i]
@@ -46,34 +46,34 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
 
     for i in range(nLines):
         #  log gf
-        SynthObj.lineList.perturbGf(i, stroke[i*2])
+        SynthObj.lineList.perturbGf(i, stroke[i])
         SynthObj.lineList.writeLineLists(i)
         wave, plus = SynthObj.run()
         newWave, plus = SpectralTools.resample(wave, plus, resolution)
-        SynthObj.lineList.perturbGf(i, -2.0*stroke[i*2])
+        SynthObj.lineList.perturbGf(i, -2.0*stroke[i])
         SynthObj.lineList.writeLineLists(i)
         wave, minus = SynthObj.run()
         newWave, minus = SpectralTools.resample(wave, minus, resolution)
-        SynthObj.lineList.perturbGf(i, stroke[i*2])
-        IM[i*2,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
-                        (plus - minus)/(2.0*stroke[i*2]), pad=0.0)
-        factor[i*2] = numpy.max(numpy.abs(IM[i*2,:]))
-        IM[i*2,:] /= factor[i*2]
+        SynthObj.lineList.perturbGf(i, stroke[i])
+        IM[i,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
+                        (plus - minus)/(2.0*stroke[i]), pad=0.0)
+        factor[i] = numpy.max(numpy.abs(IM[i,:]))
+        IM[i,:] /= factor[i]
 
         # damping
-        SynthObj.lineList.perturbVdW(i, stroke[i*2+1])
+        SynthObj.lineList.perturbVdW(i, stroke[i+nLines])
         SynthObj.lineList.writeLineLists(i)
         wave, plus = SynthObj.run()
         newWave, plus = SpectralTools.resample(wave, plus, resolution)
-        SynthObj.lineList.perturbVdW(i, -2.0*stroke[i*2+1])
+        SynthObj.lineList.perturbVdW(i, -2.0*stroke[i+nLines])
         SynthObj.lineList.writeLineLists(i)
         wave, minus = SynthObj.run()
         newWave, minus = SpectralTools.resample(wave, minus, resolution)
-        SynthObj.lineList.perturbVdW(i, stroke[i*2+1])
-        IM[i*2+1,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
-                        (plus-minus)/(2.0*stroke[i*2+1]), pad=0.0)
-        factor[i*2+1] = numpy.max(numpy.abs(IM[i*2,:]))
-        IM[i*2+1,:] /= factor[i*2+1]
+        SynthObj.lineList.perturbVdW(i, stroke[i+nLines])
+        IM[i+nLines,:] = SpectralTools.interpolate_spectrum(newWave, solarWl,
+                        (plus-minus)/(2.0*stroke[i+nLines]), pad=0.0)
+        factor[i+nLines] = numpy.max(numpy.abs(IM[i+nLines,:]))
+        IM[i+nLines,:] /= factor[i+nLines]
 
 
 
@@ -127,6 +127,11 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     S = newS.copy()
     CM = numpy.array(scipy.matrix(V.T.dot(S.T.dot(U.T)),dtype=numpy.float32)).T
 
+    fig = pyplot.figure(0)
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    ax.plot(S)
+    raw_input()
+
     hdu = pyfits.PrimaryHDU(CM)
     hdu.writeto('CommandMatrix.fits', clobber=True)
     hdu = pyfits.PrimaryHDU(factor)
@@ -143,8 +148,8 @@ Synth = MoogTools.Moog(configFile)
 Synth.lineList.writeLineLists()
 Synth.parameterFile.writeParFile()
 
-solarWave = Synth.solarSpectrum.wave#+0.2
-solarFlux = Synth.solarSpectrum.flux#+0.004
+solarWave = Synth.solarSpectrum.wave+0.1
+solarFlux = Synth.solarSpectrum.flux+0.001+ numpy.random.randn(len(solarWave))*0.001
 
 continuum = 0.0
 wlOffset = 0.0
@@ -158,6 +163,7 @@ if True:
     calculateCM(Synth, nominalWavelength, nominalSpectrum)
 
 CM = pyfits.getdata("CommandMatrix.fits")
+factor = pyfits.getdata("scalingfactor.fits")
 
 
 f1 = pyplot.figure(0)
@@ -185,7 +191,7 @@ while True:
     x, difference = SpectralTools.diff_spectra(solarWave, solarFlux, 
             Wavelengths[-1], Spectra[-1], pad=True)
     difference[Spectra[-1] == 0] = 0.0
-    command = Gain*(CM.dot(difference))
+    command = Gain*(CM.dot(difference))/factor
     #command[[i*2+1 for i in range(Synth.lineList.numLines)]] = 0.0
     
     Synth.lineList.applyCorrection(command[:-2])
@@ -223,7 +229,6 @@ while True:
     print numpy.log10(Synth.lineList.getGf(2)), numpy.log10(Synth.lineList.getVdW(2))
     print numpy.log10(Synth.lineList.getGf(3)), numpy.log10(Synth.lineList.getVdW(3))
     print numpy.log10(Synth.lineList.getGf(4)), numpy.log10(Synth.lineList.getVdW(4))
-    print command[1], command[3], command[5], command[7], command[9]
     print continuum, wlOffset, resolution
     print command[-1], command[-2], command[-3]
     raw_input()
