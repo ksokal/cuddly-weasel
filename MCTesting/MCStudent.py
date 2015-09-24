@@ -19,7 +19,7 @@ maxWlShift = 1.0
 
 def model(params):
     Synth.setSpectrumParameters(params)
-    print params
+    #print params
     return Synth.compute()
 
 def lnprior_base(p):
@@ -66,19 +66,22 @@ def fit_gp(Synth, nwalkers=32):
     initialRanges = [1.0e-8, 1.0e-8] + Synth.getInitialParameterSpreads()
     data = Synth.getObserved()
     ndim = len(initialGuess)
+    #p0 = [numpy.array(initialGuess) + 
+    #        numpy.array(initialRanges)*numpy.random.randn(ndim)
+    #        for i in xrange(nwalkers)]
     p0 = [numpy.array(initialGuess) + 
-            numpy.array(initialRanges)*numpy.random.randn(ndim)
+            1.0e-8*numpy.random.randn(ndim)
             for i in xrange(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_gp, args=data, live_dangerously=True)
 
     print("Running burn-in")
     p0, lnp, _ = sampler.run_mcmc(p0, 100)
-    """
+    #"""
     sampler.reset()
 
     print("Running Second burn-in")
     p = p0[numpy.argmax(lnp)]
-    p0 = [p + 1e-2*numpy.random.randn(ndim) for i in xrange(nwalkers)]
+    p0 = [p + 1e-8*numpy.random.randn(ndim) for i in xrange(nwalkers)]
     p0, _, _ = sampler.run_mcmc(p0, 500)
     raw_input()
     sampler.reset()
@@ -112,4 +115,4 @@ samples = sampler.flatchain
 
 fig = triangle.corner(samples[:,2:])
 fig.show()
-fig.savefig("First_Burn_In.png")
+fig.savefig("Final.png")
