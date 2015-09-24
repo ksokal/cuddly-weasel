@@ -138,6 +138,72 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     hdu.writeto('scalingfactor.fits', clobber=True)
 
 
+def model(params):
+    Synth.lineList.setParams(params)
+    return Synth.compute()
+
+def lnprior_base(p):
+    numLines = (len(p)-3)/2
+    # Are any gf's waaaaay to small/large?
+    if numpy.any(p[:numLines] > 2.0) | numpy.any(p[:numLines] < -7.0):
+        return -numpy.inf
+    # Are any damping parameters crazy?
+    if numpy.any(p[numLines:-3] > -5.0) | numpy.any(p[:numLines] < -8.5):
+        return -numpy.inf
+    # Is the smoothing/resolution at a reasonable value?
+    if not(self.minR < p[-3] < self.maxR):
+        return -numpy.inf
+    # Is the wl shift within reasonable values?
+    if (abs(p[-2]) > self.maxWlShift):   # 1 angstrom is probably a good value
+        return -numpy.inf
+    # Is the continuum factor within reasonable values?
+    if not(0.95 < p[-1] < 1.05):
+        return -numpy.inf
+    return 0.0
+
+def lnlike_gp(p, x, y, yerr):
+    a, tau = numpy.exp(p[:2])
+    gp = george.GP(a*kernels.Matern32Kernel(tau))
+    gp.compute(x, yerr)
+    return gp.lnlikelihood(y-model(p[2:], x))
+
+def lnprior_gp(p):
+    lna, lntau = p[:2]
+    if not -5 < lna < 5:
+        return -np.inf
+    if not -5 < lntau < 5:
+        return -np.inf
+    return lnprior_base(p[2:])
+
+def lnprob_gp(p, x, y, yerr):
+    lp = lnprior_gp(p)
+    if not numpy.isfinite(lp):
+        return -numpy.inf
+    return lp + lnlike_gp(p, x, y, yerr)
+
+def fit_gp(Synth, nwalkers=32):
+    initialGuess = Synth.getSpectrumParams()
+    data = Synth.getObserved()
+    ndim = len(initialGuess)
+    p0 = [numpy.array(initialGuess) + 1e-8*numpy.random.randn(ndim)
+            for i in xrange(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_gp, args=data)
+
+    print("Running burn-in")
+    p0, lnp, _ = sampler.run_mcmc(p0, 500)
+    sampler.reset()
+
+    print("Running Second burn-in")
+    p = p0[numpy.argmax(lnp)]
+    p0 = [p + 1e-8*numpy.random.randn(ndim) for i in xrange(nwalkers)]
+    p0, _, _ = sampler.run_mcmc(p0, 500)
+    sampler.reset()
+
+    print("Running production")
+    p0, _, _ = sampler.run_mcmc(p0, 1000)
+
+    return sampler
+
 
 configFile = 'CMStudent.cfg'
 
@@ -156,8 +222,7 @@ wlOffset = 0.0
 resolution = 45000
 
 
-nominalWavelength, nominalSpectrum = Synth.run()
-wave, spectrum = SpectralTools.resample(nominalWavelength, nominalSpectrum, resolution)
+sampler = fit_gp(Synth)
 
 if True:
     calculateCM(Synth, nominalWavelength, nominalSpectrum)
