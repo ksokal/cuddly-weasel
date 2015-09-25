@@ -1,3 +1,5 @@
+from __future__ import division, print_function
+
 import MoogPy
 import numpy
 import scipy
@@ -9,7 +11,7 @@ import pyfits
 import emcee
 import george
 from george import kernels
-import triangle
+#import triangle
 
 startR = 40000.0
 minR = 30000.0
@@ -75,19 +77,52 @@ def fit_gp(Synth, nwalkers=32):
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_gp, args=data, live_dangerously=True)
 
     print("Running burn-in")
-    p0, lnp, _ = sampler.run_mcmc(p0, 100)
-    #"""
+    firstChain = open('first.dat', 'w')
+    firstChain.close()
+
+    counter = 0
+    for result in sampler.sample(p0, iterations=100, storechain=False):
+        counter += 1
+        print('Step : %4d' % counter)
+        position = result[0]
+        firstChain = open('first.dat', 'a')
+        for k in range(position.shape[0]):
+            firstChain.write("{0:4d} {1:s}\n".format(k, 
+                " ".join(str(v) for v in position[k])))
+        firstChain.close()
+    lnp = result[1]
     sampler.reset()
 
+    counter = 0
     print("Running Second burn-in")
+    secondChain = open('second.dat', 'w')
+    secondChain.close()
     p = p0[numpy.argmax(lnp)]
     p0 = [p + 1e-8*numpy.random.randn(ndim) for i in xrange(nwalkers)]
-    p0, _, _ = sampler.run_mcmc(p0, 500)
-    raw_input()
+    for result in sampler.sample(p0, iterations=500, storechain=False):
+        counter += 1
+        print('Second Burn-in, Step : %4d' % counter)
+        position = result[0]
+        secondChain = open('second.dat', 'a')
+        for k in range(position.shape[0]):
+            secondChain.write("{0:4d} {1:s}\n".format(k, 
+                " ".join(str(v) for v in position[k])))
+        secondChain.close()
     sampler.reset()
 
     print("Running production")
-    p0, _, _ = sampler.run_mcmc(p0, 1000)
+    finalChain = open('final.dat', 'w')
+    finalChain.close()
+    counter = 0
+    for result in sampler.sample(p0, iterations=1000, storechain=False):
+        counter += 1
+        print('Final, Step : %4d' % counter)
+        position = result[0]
+        finalChain = open('final.dat', 'a')
+        for k in range(position.shape[0]):
+            finalChain.write("{0:4d} {1:s}\n".format(k, 
+                " ".join(str(v) for v in position[k])))
+        finalChain.close()
     #"""
     return sampler
 
