@@ -79,11 +79,13 @@ def fit_gp(Synth, nwalkers=128):
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_gp, args=data, live_dangerously=True)
 
     print("Running burn-in")
+    #p0, lnp, _ = sampler.run_mcmc(p0, 50)
+    #"""
     firstChain = open('first.dat', 'w')
     firstChain.close()
 
     counter = 0
-    for result in sampler.sample(p0, iterations=50):
+    for result in sampler.sample(p0, iterations=100):
         counter += 1
         print('Step : %4d' % counter)
         position = result[0]
@@ -94,10 +96,11 @@ def fit_gp(Synth, nwalkers=128):
         print('%.4f' % numpy.mean(sampler.acceptance_fraction))
     lnp = result[1]
     p = position[numpy.argmax(lnp)]
-    sampler.reset()
+    #"""
 
     samples = sampler.flatchain
 
+    sampler.reset()
     f1 = triangle.corner(samples[:,2:])
     f1.savefig("first.png")
 
@@ -106,11 +109,15 @@ def fit_gp(Synth, nwalkers=128):
     #ax.plot(model(p[2:]))
 
 
-    counter = 0
     print("Running Second burn-in")
+    p0 = [p + 1e-6*numpy.random.randn(ndim) for i in xrange(nwalkers)]
+    
+    p0, _, _ = sampler.run_mcmc(p0, 500)
+
+    """
     secondChain = open('second.dat', 'w')
     secondChain.close()
-    p0 = [p + 1e-6*numpy.random.randn(ndim) for i in xrange(nwalkers)]
+    counter = 0
     for result in sampler.sample(p0, iterations=500, storechain=False):
         counter += 1
         print('Second Burn-in, Step : %4d' % counter)
@@ -119,21 +126,12 @@ def fit_gp(Synth, nwalkers=128):
         for k in range(position.shape[0]):
             secondChain.write("%4d %.4f %s\n" % (k, numpy.mean(sampler.acceptance_fraction), " ".join(str(v) for v in position[k])))
         secondChain.close()
+    #"""
     sampler.reset()
 
     print("Running production")
-    finalChain = open('final.dat', 'w')
-    finalChain.close()
-    counter = 0
-    for result in sampler.sample(result, iterations=1000):
-        counter += 1
-        print('Final, Step : %4d' % counter)
-        position = result[0]
-        finalChain = open('final.dat', 'a')
-        for k in range(position.shape[0]):
-            finalChain.write("%4f %.4f %s\n" % (k, numpy.mean(sampler.acceptance_fraction), " ".join(str(v) for v in position[k])))
-        finalChain.close()
-    #"""
+
+    p0, _, _ = sampler.run_mcmc(p0, 1000)
     return sampler
 
 
