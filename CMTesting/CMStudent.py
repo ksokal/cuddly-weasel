@@ -130,7 +130,6 @@ def calculateCM(SynthObj, nominalWave, nominalSpectrum):
     fig = pyplot.figure(0)
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
     ax.plot(S)
-    raw_input()
 
     hdu = pyfits.PrimaryHDU(CM)
     hdu.writeto('CommandMatrix.fits', clobber=True)
