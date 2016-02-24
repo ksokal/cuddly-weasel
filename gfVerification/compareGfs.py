@@ -11,10 +11,12 @@ ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
 
 baseName = sys.argv[1]
 
-arcturusConfig = AstroUtils.parse_config(baseName+".solar.cfg")
-solarConfig = AstroUtils.parse_config(baseName+".arcturus.cfg")
-originalConfig = AstroUtils.parse_config(baseName+".cfg")
+arcturusConfig = AstroUtils.parse_config(baseName+"_Solar.cfg")
+solarConfig = AstroUtils.parse_config(baseName+"_Arcturus.cfg")
+originalConfig = arcturusConfig.copy()
 
+arcturusConfig["applyCorrections"] = True
+solarConfig["applyCorrections"] = True
 
 
 arcturus = MoogTools.LineList(None, arcturusConfig)
@@ -29,11 +31,13 @@ dsol = []
 darc = []
 species = []
 expot = []
+wl = []
 
 for i in range(original.nStrong):
     orig.append(original.strongLines[i].loggf)
     sol.append(solar.strongLines[i].loggf)
     arc.append(arcturus.strongLines[i].loggf)
+    wl.append(arcturus.strongLines[i].wl)
     diff.append(sol[-1] - arc[-1])
     dsol.append(sol[-1] - orig[-1])
     darc.append(arc[-1] - orig[-1])
@@ -44,6 +48,7 @@ for i in range(original.numLines - original.nStrong):
     orig.append(original.weakLines[i].loggf)
     sol.append(solar.weakLines[i].loggf)
     arc.append(arcturus.weakLines[i].loggf)
+    wl.append(arcturus.weakLines[i].wl)
     diff.append(sol[-1] - arc[-1])
     dsol.append(sol[-1] - orig[-1])
     darc.append(arc[-1] - orig[-1])
@@ -58,17 +63,31 @@ dsol = numpy.array(dsol)
 darc = numpy.array(darc)
 species = numpy.array(species)
 expot = numpy.array(expot)
+wl = numpy.array(wl)
 
 changed = diff != 0.0
 
 #ax.plot([-6, 0], [-6, 0])
-ax.scatter(orig[changed], sol[changed], color = 'b', label='Solar', s=species[changed])
-ax.scatter(orig[changed], arc[changed], color = 'r', label='Arcturus', s=species[changed])
-ax.legend(loc=2)
-ax.set_xbound(-4.0, 1.0)
-ax.set_ybound(-4.0, 1.0)
-ax.set_xlabel("Original log gf")
-ax.set_ylabel("New log gf")
+#for w, s, a, sp, e in zip(wl[changed], dsol[changed], darc[changed], species[changed],
+#        expot[changed]):
+#    e *= 10.
+#    ax.plot([w, w], [s, a], color = 'k')
+#    ax.scatter([w], [s], color = 'b', s=[e,e])
+#    ax.scatter([w], [a], color = 'r', s=[e,e])
+#ax.plot([numpy.min(wl), numpy.max(wl)], [0.0, 0.0])
+
+ax.scatter(expot[changed], dsol[changed], label='Solar', color = 'b')
+ax.scatter(expot[changed], darc[changed], label='Arcturus', color = 'r')
+
+#ax.scatter(wl[changed], dsol[changed]/10, color = 'b', label='Solar', s=species[changed])
+#ax.scatter(wl[changed], darc[changed]/10, color = 'r', label='Arcturus', s=species[changed])
+#for 
+#ax.plot([-4, 1.0], [-4, 1.0])
+ax.legend(loc=3)
+#ax.set_xbound(-4.0, 1.0)
+#ax.set_ybound(-4.0, 1.0)
+ax.set_xlabel("Excitation Potential (eV)")
+ax.set_ylabel("Delta log gf")
 #ax.scatter(expot[changed], diff[changed])
 
 #ax.scatter(orig[changed], dsol[changed], color = 'r')

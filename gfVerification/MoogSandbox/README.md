@@ -1,1 +1,1 @@
-Here is where all the data files for Moog should go (i.e. line lists, etc...)
+This is a directory in which Moog can do its dirty work

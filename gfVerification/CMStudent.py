@@ -67,6 +67,7 @@ class ControlMatrix( object ):
             self.CM[i] = lineCM[i]
         for j in range(globalCM.shape[0]):
             self.CM[i+j+1] = globalCM[j]
+        
 
     def dot(self, difference):
         overlap_start = numpy.max([numpy.min(self.observed.wl), numpy.min(difference.wl)])
@@ -306,13 +307,16 @@ Spectra = [resampled]
 if calcIM:
     calculateIM(Synth, resampled, resolution)
 
-Gain = 0.35
+Gain = 0.15
 IM = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+"_IM.fits")
 factor = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+"_factors.fits")
 gfIndices = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+'_gf.fits')
 vdWIndices = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+'_vdW.fits')
 CM = ControlMatrix(IM, factor, solar, nFiltModes, Gain, ax=ax1)
 #CM = ControlMatrix(IM, factor, solar, nFiltModes, Gain)
+
+hdu = pyfits.PrimaryHDU(CM.CM)
+hdu.writeto(Synth.config["outputDir"]+Synth.config["baseName"]+"_CM.fits", clobber=True)
 
 cb = ax1.matshow(CM.CM, aspect='auto')
 blah = pyplot.colorbar(cb)
@@ -343,7 +347,7 @@ for j in range(50):
         if vdWIndices[i] != -1:
             Synth.lineList.perturbVdW(i, command[vdWIndices[i]], push=True)
 
-    continuum = continuum+command[-4]
+    #continuum = continuum+command[-4]
     wlOffset = wlOffset+command[-3]
     #resolution = resolution*(1.0+command[-2])
     rotation = rotation+command[-1]
