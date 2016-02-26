@@ -12,11 +12,10 @@ import string
 import sys
 
 class ControlMatrix( object ):
-    def __init__(self, IM, factor, observed, nFiltModes, Gain, ax=None):
+    def __init__(self, IM, factor, observed, Gain, ax=None):
         self.IM = IM
         self.factor = factor
         self.observed = observed
-        self.nFiltModes = nFiltModes
         self.ax = ax
         self.calcCM()
         self.Gain = Gain
@@ -167,8 +166,9 @@ def calculateIM(SynthObj, nominalSpectrum, resolution):
             minus.flux_I[minus.flux_I == 0.0] = 1.0
         IF = (plus - minus).flux_I/(2.0*stroke)
         vdWf = numpy.max(numpy.abs(IF))
-        print("Line %.4f  - %d out of %d, gf Factor: %.4f, vdW Factor: %.4f, strength %.4f" % 
-                (SynthObj.lineList.getWl(i), i, nLines, gff, vdWf, strength))
+        print("%s Line %.4f  - %d out of %d, strength %.4f" % 
+                (SynthObj.config["baseName"], SynthObj.lineList.getWl(i),
+                i, nLines, strength))
         if (vdWf > 1e-3):
             counter += 1
             overlap_start = numpy.max([numpy.min(solarWl), numpy.min(plus.wl)])
@@ -259,9 +259,16 @@ def calculateIM(SynthObj, nominalSpectrum, resolution):
 
 
 configFile = sys.argv[1]
-nFiltModes = float(sys.argv[2])
-calcIM = bool(sys.argv[3]=='True')
-moogInstance = sys.argv[4]
+calcIM = bool(sys.argv[2]=='True')
+moogInstance = sys.argv[3]
+try:
+    contFloat = bool(sys.argv[4]== 'True')
+except:
+    contFloat = False
+try:
+    rotFloat = bool(sys.argv[5] == 'True')
+except:
+    rotFloat = False
 
 f1 = pyplot.figure(0)
 f1.clear()
@@ -272,8 +279,8 @@ diffplot = False
 
 Synth = MoogTools.MoogStokes(configFile, moogInstance=moogInstance, fileBase=''.join(random.choice(string.ascii_letters)
                 for _ in range(3)))
-Synth.lineList.writeLineLists()
-Synth.parameterFile.writeParFile()
+#Synth.lineList.writeLineLists()
+#Synth.parameterFile.writeParFile()
 
 outFile = Synth.config["outputDir"] + Synth.config["baseName"]+'_results.dat'
 inFile = Synth.config["inFile"]
@@ -312,7 +319,7 @@ IM = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+"_IM.fits
 factor = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+"_factors.fits")
 gfIndices = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+'_gf.fits')
 vdWIndices = pyfits.getdata(Synth.config["outputDir"]+Synth.config["baseName"]+'_vdW.fits')
-CM = ControlMatrix(IM, factor, solar, nFiltModes, Gain, ax=ax1)
+CM = ControlMatrix(IM, factor, solar, Gain, ax=ax1)
 #CM = ControlMatrix(IM, factor, solar, nFiltModes, Gain)
 
 hdu = pyfits.PrimaryHDU(CM.CM)
@@ -347,10 +354,16 @@ for j in range(50):
         if vdWIndices[i] != -1:
             Synth.lineList.perturbVdW(i, command[vdWIndices[i]], push=True)
 
-    #continuum = continuum+command[-4]
+    if contFloat:
+        continuum = continuum+command[-4]
+    else:
+        continuum = 0.0
     wlOffset = wlOffset+command[-3]
     #resolution = resolution*(1.0+command[-2])
-    rotation = rotation+command[-1]
+    if rotFloat:
+        rotation = rotation+command[-1]
+    else:
+        rotation = 0.0
     Synth.run()
     output = Synth.Spectra[-1].resample(R=resolution).rotate(angle=rotation)
     Synth.Spectra = []
@@ -384,7 +397,7 @@ for j in range(50):
 
     print j, continuum, wlOffset, resolution, rotation
     power = numpy.mean((command**2.0)**(0.5))
-    print numpy.std(command), numpy.mean((command**2.0)**(0.5))
+    print Synth.config["baseName"], numpy.std(command), numpy.mean((command**2.0)**(0.5))
     #raw_input()
 
 ax2.clear()

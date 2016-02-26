@@ -4,7 +4,8 @@ import matplotlib.pyplot as pyplot
 import pyfits
 import MoogTools
 
-baseNames = ['Alpha', 'Bravo']
+baseNames = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf',
+        'Hotel', 'India', 'Juliett', 'Kilo', 'Lima', 'Mike', 'November', 'Oscar']
 
 outName = '/home/deen/MoogPyData/AbsorptionLines/corrections/compositeCorrected.dat'
 
