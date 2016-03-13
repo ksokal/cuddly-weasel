@@ -158,8 +158,8 @@ raw, interpolated, integrated, convolved, observed = orchestra.getMelodyParams()
 
 parameters = parseParams(convolved)
 
-wlStart = 21700
-wlStop = 22800
+wlStart = 19000
+wlStop = 23800
 
 while True:
     selected, desired = getGridPoints(parameters, convolved, wlStart, wlStop)

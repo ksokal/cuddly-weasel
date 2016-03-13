@@ -34,21 +34,29 @@ fig.clear()
 ax1 = fig.add_axes([0.1, 0.1, 0.8, 0.4])
 ax2 = fig.add_axes([0.1, 0.5, 0.8, 0.4])
 
+#wlStart = 22880.0
+#wlStop = 24000.0
 #wlStart = 22700.0
-#wlStop = 23000.0
-wlStart = 22100.0
-wlStop = 22350.0
+#wlStop = 22890.0
+#wlStart = 22100.0
+#wlStop = 22550.0
 #wlStart = 21700.0
-#wlStop = 21950.0
+#wlStop = 21980.0
 #wlStart = 22010.0
-#wlStop = 22150.0
+#wlStop = 22550.0
+#wlStart = 20000.0
+#wlStop = 21000.0
+#wlStart = 21000.0
+#wlStop = 22000.0
+wlStart = 22000.0
+wlStop = 22800.0
 
-filename = '../TWHydra/TWHydra.fits'
-observed = Moog960.ObservedMelody.fromFile(filename=filename, label='IGRINS TWHydra')
+filename = '/home/deen/Investigations/TWHydra/TWHydra.fits'
+TWHya = Moog960.ObservedMelody.fromFile(filename=filename, label='IGRINS TWHydra')
 
-observed.selectPhrases(wlRange = [wlStart, wlStop])
-observed.loadData()
-observed_spectra, observed_label = observed.perform()
+TWHya.selectPhrases(wlRange = [wlStart, wlStop])
+TWHya.loadData()
+observed_spectra, observed_label = TWHya.perform()
 
 for obs in observed_spectra[0]:
     obs.wl = obs.wl - 5.5
@@ -73,21 +81,22 @@ veiled = []
 #for T, G, B, color in zip(Ts, Gs, Bs, colors):
 for spectrum, label, color in zip(spectra, params, colors):
     for phrase, l in zip(spectrum, label):
-        phrase.bin(obs.wl)
-        bestFit.append(fit(phrase.flux_I, obs.flux_I))
-        #bestFit[-1][0] = 0.3
-        print bestFit
-        raw_input()
-        phrase.flux_I = (phrase.flux_I+bestFit[-1][0])/(1.0+bestFit[-1][0])
-        ax1.plot(phrase.wl, phrase.flux_I, color = color, lw=2.0)
-        v = {}
-        v["spectrum"] = phrase
-        v["Teff"] = l.parameters["TEFF"]
-        v["log g"] = l.parameters["LOGG"]
-        v["B"] = l.parameters["BFIELD"]
-        v["color"] = color
-        v["veiling"] = bestFit[-1][0]
-        veiled.append(v)
+        print phrase.wl[0], phrase.wl[-1]
+        if ((phrase.wl[0] < wlStart) & (phrase.wl[-1] > wlStop)): 
+            phrase.bin(obs.wl)
+            bestFit.append(fit(phrase.flux_I, obs.flux_I))
+            #bestFit[-1][0] = 0.3
+            print bestFit
+            phrase.flux_I = (phrase.flux_I+bestFit[-1][0])/(1.0+bestFit[-1][0])
+            ax1.plot(phrase.wl, phrase.flux_I, color = color, lw=2.0)
+            v = {}
+            v["spectrum"] = phrase
+            v["Teff"] = l.parameters["TEFF"]
+            v["log g"] = l.parameters["LOGG"]
+            v["B"] = l.parameters["BFIELD"]
+            v["color"] = color
+            v["veiling"] = bestFit[-1][0]
+            veiled.append(v)
 
 
 bestFit = numpy.average(numpy.array(bestFit), axis=0)
