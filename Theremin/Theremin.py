@@ -119,14 +119,17 @@ def computeIMs(orchestra):
     #raw, interpolated, integrated, convolved, observed = orchestra.getMelodyParams()
     convolved = orchestra.convolved_labels
 
-    orchestra.master(selectedLabels=convolved, keySignature='CONVOLVED')
+    mastered = orchestra.master(selectedLabels=convolved, keySignature='CONVOLVED')
 
-    params = parseParams(convolved)
+    params = parseParams(mastered)
 
     wlStart = numpy.min(params["WLSTART"])
     wlStop = numpy.max(params["WLSTOP"])
 
-    orchestra.selectExcerpt(wlRange =[wlStart, wlStop], exact=True)
+    for blah in mastered:
+        blah.parameters["SELECTED"] = True
+
+    #orchestra.selectExcerpt(wlRange =[wlStart, wlStop], exact=True)
 
     TeffStroke = 50.0
     loggStroke = 0.5
@@ -141,7 +144,6 @@ def computeIMs(orchestra):
     for T in params["TEFF"]:
         for G in params["LOGG"]:
             for B in params["BFIELD"]:
-                #orchestra.selectMelodies(wlRange =[wlStart, wlStop], exact=True)
                 IM = []
                 factor = []
                 plusT = numpy.min([T+TeffStroke, Tmax])
@@ -157,7 +159,13 @@ def computeIMs(orchestra):
                 IM.append(plus-minus)
                 factor.append(plusLabel.parameters["TEFF"] - minusLabel.parameters["TEFF"])
 
-                #print asdf
+           
+                print plusT, minusT
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
 
                 plusG = numpy.min([G+loggStroke, Gmax])
                 plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
@@ -170,7 +178,14 @@ def computeIMs(orchestra):
                 minus, minusLabel = minusMelody.perform(label=minusLabels[0])
 
                 IM.append(plus-minus)
-                factor.append(plusLabel.parameters["TEFF"] - minusLabel.parameters["TEFF"])
+                factor.append(plusLabel.parameters["LOGG"] - minusLabel.parameters["LOGG"])
+
+                print plusG, minusG
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
 
                 plusB = numpy.min([B+BfieldStroke, Bmax])
                 plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
@@ -185,136 +200,18 @@ def computeIMs(orchestra):
                 IM.append(plus-minus)
                 factor.append(plusLabel.parameters["BFIELD"] - minusLabel.parameters["BFIELD"])
 
-                print asdf
+                print plusB, minusB
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
 
                 
 
 
     print blah
     return
-
-def calculateIMSs(SynthObj, nominalSpectrum, resolution):
-    obsWl = nominalSpectrum.wl
-    nModes = 5    # Teff, log g, Bfield, wlShift, continuumShift, 
-    nPts = len(obsWl)
-
-    IM = numpy.zeros((0, nPts))
-
-    factor = []
-    TeffStroke = 100.0
-    loggStroke = 0.25
-    BfieldStroke = 0.5
-    continuumStroke = 0.01                  # Continuum Shift
-    wlShiftStroke = 0.5                    # WL Shift
-    #rotationStroke = 1e-6                 # Spectrum rotation
-
-    counter = 0
-    wlStart = SynthObj.parameterFile.config["wlStart"]
-    wlStop = SynthObj.parameterFile.config["wlStop"]
-
-    '''
-    SynthObj.run()
-        SynthObj.run(lineIndex=i, partial=True)
-        plus = SynthObj.Spectra[-1].resample(R=resolution, observedWl=solarWl)
-        SynthObj.lineList.perturbVdW(i, -2.0*stroke)
-        SynthObj.run(lineIndex=i, partial=True)
-        minus = SynthObj.Spectra[-1].resample(R=resolution, observedWl=solarWl)
-        SynthObj.lineList.perturbVdW(i, stroke)
-        if i >= nStrong:
-            plus.flux_I[plus.flux_I == 0.0] = 1.0
-            minus.flux_I[minus.flux_I == 0.0] = 1.0
-        IF = (plus - minus).flux_I/(2.0*stroke)
-        vdWf = numpy.max(numpy.abs(IF))
-        print("%s Line %.4f  - %d out of %d, strength %.4f" % 
-                (SynthObj.config["baseName"], SynthObj.lineList.getWl(i),
-                i, nLines, strength))
-        if (vdWf > 1e-3):
-            counter += 1
-            overlap_start = numpy.max([numpy.min(solarWl), numpy.min(plus.wl)])
-            overlap_stop = numpy.min([numpy.max(solarWl), numpy.max(minus.wl)])
-            overlap = scipy.where((solarWl >= overlap_start) & (solarWl <= overlap_stop))
-            padded = numpy.zeros(len(solarWl))
-            padded[overlap] = IF
-
-            IM = numpy.resize(IM, (counter, nPts))
-            IM[counter-1,:] = padded/vdWf
-            factor.append(vdWf)
-            vdWIndices[i] = counter-1
-
-    #Continuum Level
-    plus = nominalSpectrum.flux_I + continuumStroke
-    minus = nominalSpectrum.flux_I - continuumStroke
-
-    counter += 1
-    IM = numpy.resize(IM, (counter, nPts))
-    IM[-1, :] = (plus-minus)/(2.0*continuumStroke)
-    factor.append(numpy.max(numpy.abs(IM[-1,:])))
-    IM[-1,:] /= factor[-1]
-
-    #Wavelength Shift
-    plus = nominalSpectrum.resample(R=resolution)
-    plus.wl += wlShiftStroke
-    plus.bin(solarWl)
-
-    minus = nominalSpectrum.resample(R=resolution)
-    minus.wl -= wlShiftStroke
-    minus.bin(solarWl)
-    
-    IF = (plus - minus).flux_I/(2.0*wlShiftStroke)
-    overlap_start = numpy.max([numpy.min(solarWl), numpy.min(plus.wl)])
-    overlap_stop = numpy.min([numpy.max(solarWl), numpy.max(minus.wl)])
-    overlap = scipy.where((solarWl >= overlap_start) & (solarWl <= overlap_stop))
-    padded = numpy.zeros(len(solarWl))
-    padded[overlap] = IF
-    
-    counter += 1
-    IM = numpy.resize(IM, (counter, nPts))
-    IM[-1,:] = padded
-    factor.append(numpy.max(numpy.abs(IM[-1,:])))
-    IM[-1,:] /= factor[-1]
-    
-    #"""
-    #Instrumental Smoothing
-    plus = nominalSpectrum.resample(R=resolution*(1.0+smoothingStroke),
-            observedWl=solarWl)
-    minus = nominalSpectrum.resample(R=resolution*(1.0-smoothingStroke),
-            observedWl=solarWl)
-    IF = (plus - minus).flux_I/(2.0*smoothingStroke)
-    overlap_start = numpy.max([numpy.min(solarWl), numpy.min(plus.wl)])
-    overlap_stop = numpy.min([numpy.max(solarWl), numpy.max(minus.wl)])
-    overlap = scipy.where((solarWl >= overlap_start) & (solarWl <= overlap_stop))
-    padded = numpy.zeros(len(solarWl))
-    padded[overlap] = IF
-    
-    counter += 1
-    IM = numpy.resize(IM, (counter, nPts))
-    IM[-1,:] = padded
-    factor.append(numpy.max(numpy.abs(IM[-1,:])))
-    IM[-1,:] /= factor[-1]
-
-    #"""
-    # Spectrum Rotation
-    plus = nominalSpectrum.rotate(angle=rotationStroke)
-    minus = nominalSpectrum.rotate(angle=-rotationStroke)
-    IF = (plus - minus).flux_I/(2.0*rotationStroke)
-
-    counter += 1
-    IM = numpy.resize(IM, (counter, nPts))
-    IM[-1, :] = IF
-    factor.append(numpy.max(numpy.abs(IM[-1,:])))
-    IM[-1,:] /= factor[-1]
-    
-    factor = numpy.array(factor)
-
-    hdu = pyfits.PrimaryHDU(IM)
-    hdu.writeto(SynthObj.config["outputDir"]+SynthObj.config["baseName"]+"_IM.fits", clobber=True)
-    hdu = pyfits.PrimaryHDU(factor)
-    hdu.writeto(SynthObj.config["outputDir"]+SynthObj.config["baseName"]+'_factors.fits', clobber=True)
-    hdu = pyfits.PrimaryHDU(vdWIndices)
-    hdu.writeto(SynthObj.config["outputDir"]+SynthObj.config["baseName"]+'_vdW.fits', clobber=True)
-    hdu = pyfits.PrimaryHDU(gfIndices)
-    hdu.writeto(SynthObj.config["outputDir"]+SynthObj.config["baseName"]+'_gf.fits', clobber=True)
-    '''
 
 
 configFile = sys.argv[1]
@@ -324,10 +221,10 @@ try:
     contFloat = bool(sys.argv[4]== 'True')
 except:
     contFloat = False
-try:
-    rotFloat = bool(sys.argv[5] == 'True')
-except:
-    rotFloat = False
+#try:
+#    rotFloat = bool(sys.argv[5] == 'True')
+#except:
+#    rotFloat = False
 
 f1 = pyplot.figure(0)
 f1.clear()
@@ -338,17 +235,6 @@ config = AstroUtils.parse_config(configFile)
 orchestra = Moog960.Score(directory='../MusicMaker/TWHydra_T3*', observed=config["inFile"], suffix='')
 
 IMs = computeIMs(orchestra)
-
-Synth = MoogTools.MoogStokes(configFile, moogInstance=moogInstance,
-            fileBase=''.join(random.choice(string.ascii_letters)
-            for _ in range(3)), progressBar=True)
-
-outFile = Synth.config["outputDir"] + Synth.config["baseName"]+'_results.dat'
-inFile = Synth.config["inFile"]
-
-continuum = 0.00
-wlOffset = Synth.config["wlShift"]
-resolution = Synth.config["resolvingPower"]
 
 twhya = observed[0][0]
 twhya.wl += wlOffset
