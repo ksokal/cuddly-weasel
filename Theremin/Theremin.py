@@ -5,7 +5,7 @@ import AstroUtils
 import MoogTools
 import Moog960
 import SpectralTools
-import pyfits
+import astropy.io.fits as pyfits
 import random
 import string
 import sys
@@ -116,7 +116,8 @@ class ControlMatrix( object ):
         return command
 
 def computeIMs(orchestra):
-    raw, interpolated, integrated, convolved, observed = orchestra.getMelodyParams()
+    #raw, interpolated, integrated, convolved, observed = orchestra.getMelodyParams()
+    convolved = orchestra.convolved_labels
 
     orchestra.master(selectedLabels=convolved, keySignature='CONVOLVED')
 
@@ -125,7 +126,7 @@ def computeIMs(orchestra):
     wlStart = numpy.min(params["WLSTART"])
     wlStop = numpy.max(params["WLSTOP"])
 
-    orchestra.selectMelodies(wlRange =[wlStart, wlStop], exact=True)
+    orchestra.selectExcerpt(wlRange =[wlStart, wlStop], exact=True)
 
     TeffStroke = 50.0
     loggStroke = 0.5
@@ -140,7 +141,7 @@ def computeIMs(orchestra):
     for T in params["TEFF"]:
         for G in params["LOGG"]:
             for B in params["BFIELD"]:
-                orchestra.selectMelodies(wlRange =[wlStart, wlStop], exact=True)
+                #orchestra.selectMelodies(wlRange =[wlStart, wlStop], exact=True)
                 IM = []
                 factor = []
                 plusT = numpy.min([T+TeffStroke, Tmax])
@@ -156,7 +157,7 @@ def computeIMs(orchestra):
                 IM.append(plus-minus)
                 factor.append(plusLabel.parameters["TEFF"] - minusLabel.parameters["TEFF"])
 
-                print asdf
+                #print asdf
 
                 plusG = numpy.min([G+loggStroke, Gmax])
                 plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
@@ -334,7 +335,7 @@ ax1 = f1.add_axes([0.1, 0.1, 0.8, 0.8])
 
 config = AstroUtils.parse_config(configFile)
 
-orchestra = Moog960.Score(directory='../MusicMaker/TWHydra', observed=config["inFile"], suffix='')
+orchestra = Moog960.Score(directory='../MusicMaker/TWHydra_T3*', observed=config["inFile"], suffix='')
 
 IMs = computeIMs(orchestra)
 
