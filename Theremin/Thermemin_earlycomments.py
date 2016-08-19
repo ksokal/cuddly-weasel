@@ -237,6 +237,7 @@ class ControlMatrix( object ):
         command =  self.Gain*(self.dot(difference))/self.factor
         command[factor < 1e-3] = 0.0
         return command
+<<<<<<< HEAD
     
 '''
 This program is to take your grid of synthetic spectra then try to find a best fit model. 
@@ -244,6 +245,107 @@ This program is to take your grid of synthetic spectra then try to find a best f
 i am editing this to see what works.
 
 >run theremin.py alpha.cfg 'Alpha'
+=======
+
+def computeIMs(orchestra):
+    #raw, interpolated, integrated, convolved, observed = orchestra.getMelodyParams()
+    convolved = orchestra.convolved_labels
+
+    mastered = orchestra.master(selectedLabels=convolved, keySignature='CONVOLVED')
+
+    params = parseParams(mastered)
+
+    wlStart = numpy.min(params["WLSTART"])
+    wlStop = numpy.max(params["WLSTOP"])
+
+    for blah in mastered:
+        blah.parameters["SELECTED"] = True
+
+    #orchestra.selectExcerpt(wlRange =[wlStart, wlStop], exact=True)
+
+    TeffStroke = 50.0
+    loggStroke = 0.5
+    BfieldStroke = 1.0
+    Tmin = numpy.min(params["TEFF"])
+    Tmax = numpy.max(params["TEFF"])
+    Gmin = numpy.min(params["LOGG"])
+    Gmax = numpy.max(params["LOGG"])
+    Bmin = numpy.min(params["BFIELD"])
+    Bmax = numpy.max(params["BFIELD"])
+
+    for T in params["TEFF"]:
+        for G in params["LOGG"]:
+            for B in params["BFIELD"]:
+                IM = []
+                factor = []
+                plusT = numpy.min([T+TeffStroke, Tmax])
+                plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":plusT, 
+                    "LOGG":G, "BFIELD":B})
+                plus, plusLabel = plusMelody.perform(label=plusLabels[0])
+
+                minusT = numpy.max([T-TeffStroke, Tmin])
+                minusMelody, minusLabels = orchestra.blend(desiredParameters = {"TEFF":minusT, 
+                    "LOGG":G, "BFIELD":B})
+                minus, minusLabel = minusMelody.perform(label=minusLabels[0])
+
+                IM.append(plus-minus)
+                factor.append(plusLabel.parameters["TEFF"] - minusLabel.parameters["TEFF"])
+
+           
+                print plusT, minusT
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
+
+                plusG = numpy.min([G+loggStroke, Gmax])
+                plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
+                    "LOGG":plusG, "BFIELD":B})
+                plus, plusLabel = plusMelody.perform(label=plusLabels[0])
+
+                minusG = numpy.max([G-loggStroke, Gmin])
+                minusMelody, minusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
+                    "LOGG":minusG, "BFIELD":B})
+                minus, minusLabel = minusMelody.perform(label=minusLabels[0])
+
+                IM.append(plus-minus)
+                factor.append(plusLabel.parameters["LOGG"] - minusLabel.parameters["LOGG"])
+
+                print plusG, minusG
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
+
+                plusB = numpy.min([B+BfieldStroke, Bmax])
+                plusMelody, plusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
+                    "LOGG":G, "BFIELD":plusB})
+                plus, plusLabel = plusMelody.perform(label=plusLabels[0])
+
+                minusB = numpy.max([B-BfieldStroke, Bmin])
+                minusMelody, minusLabels = orchestra.blend(desiredParameters = {"TEFF":T, 
+                    "LOGG":G, "BFIELD":minusB})
+                minus, minusLabel = minusMelody.perform(label=minusLabels[0])
+
+                IM.append(plus-minus)
+                factor.append(plusLabel.parameters["BFIELD"] - minusLabel.parameters["BFIELD"])
+
+                print plusB, minusB
+                ax1.clear()
+                plusLabel.Spectrum.plot(ax=ax1)
+                minusLabel.Spectrum.plot(ax=ax1)
+                ax1.figure.show()
+                raw_input()
+
+                
+
+
+    print blah
+    return
+
+>>>>>>> upstream/master
 
      '''
      ###
@@ -259,15 +361,36 @@ try:
     contFloat = bool(sys.argv[3]== 'True')
 except:
     contFloat = False
+<<<<<<< HEAD
+=======
+#try:
+#    rotFloat = bool(sys.argv[5] == 'True')
+#except:
+#    rotFloat = False
+
+f1 = pyplot.figure(0)
+f1.clear()
+ax1 = f1.add_axes([0.1, 0.1, 0.8, 0.8])
+>>>>>>> upstream/master
 
     #now put that info into some use
 config = AstroUtils.parse_config(configFile)
 
+<<<<<<< HEAD
 #now read in your grid of synthetic models
 #NOTE THAT THIS IS THE START OF YOUR FILE NAMES AS WELL
 directory_grid='/Users/sokal/Desktop/TWHya Kband Grid/TWHydra_Kband/MoogStokesSynthSpec_T5*B1*'
 print directory_grid
 orchestra = Moog960.Score(directory=directory_grid, observed=config["inFile"], suffix='')
+=======
+orchestra = Moog960.Score(directory='../MusicMaker/TWHydra_T3*', observed=config["inFile"], suffix='')
+
+IMs = computeIMs(orchestra)
+
+twhya = observed[0][0]
+twhya.wl += wlOffset
+twhya.flux_I += continuum
+>>>>>>> upstream/master
 
 print '**** HEY IT WORKED I HAVE A SCORE< SEE?', orchestra
 print configFile
