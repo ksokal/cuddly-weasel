@@ -9,10 +9,11 @@ fig = pyplot.figure(0)
 fig.clear()
 ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
 
-vsini = 5.8
+vsini = 20.0
 R = 45000.0
 
-datadir = '/home/cdeen/Data/MoogPyGrid/CorrectedRawData/'
+#where the raw spectra are
+datadir = '/Volumes/IGRINS_McD_2014_2016/MoogStokes_Raw_Models/CorrectedRawData/'
 
 files = glob.glob(datadir+'*_raw.fits')
 
